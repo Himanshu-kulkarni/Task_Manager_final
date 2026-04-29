@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NEXUS // Task Manager</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --cyan:    #00f5ff;
+      --magenta: #ff00aa;
+      --yellow:  #f5ff00;
+      --green:   #00ff88;
+      --bg:      #030610;
+      --bg2:     #07101f;
+      --panel:   rgba(0,20,45,0.7);
+      --border:  rgba(0,245,255,0.18);
+      --text:    #c8e8ff;
+      --dim:     rgba(200,232,255,0.35);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 15px;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated grid background ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(0,245,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,245,255,0.04) 1px, transparent 1px);
+      background-size: 44px 44px;
+      animation: gridDrift 20s linear infinite;
+    }
+    @keyframes gridDrift { to { background-position: 44px 44px; } }
+
+    /* scanline overlay */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 1;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px, transparent 3px,
+        rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+    }
+
+    .wrapper {
+      position: relative; z-index: 2;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 42px;
+    }
+    .logo-line {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(28px, 6vw, 52px);
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      color: var(--cyan);
+      text-shadow: 0 0 18px rgba(0,245,255,0.7), 0 0 60px rgba(0,245,255,0.25);
+      animation: flicker 8s infinite;
+    }
+    .logo-line span { color: var(--magenta); text-shadow: 0 0 18px rgba(255,0,170,0.8); }
+    @keyframes flicker {
+      0%,95%,100% { opacity:1 }
+      96% { opacity:0.7 }
+      97% { opacity:1 }
+      98% { opacity:0.6 }
+    }
+    .tagline {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.4em;
+      color: var(--dim);
+      margin-top: 6px;
+      text-transform: uppercase;
+    }
+
+    /* ── Stats row ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .stat-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 12px;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      transition: border-color .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-box::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    }
+    .stat-box:hover { border-color: var(--cyan); }
+    .stat-val {
+      font-family: 'Orbitron', monospace;
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--cyan);
+      text-shadow: 0 0 14px rgba(0,245,255,0.5);
+    }
+    .stat-label {
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: var(--dim);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      margin-bottom: 20px;
+      position: relative;
+    }
+    .panel::before {
+      content: '';
+      position: absolute; top: 0; left: 24px; right: 24px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent);
+    }
+    .panel-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      color: var(--cyan);
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+
+    /* ── Form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .form-row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+    input, select {
+      background: rgba(0,20,50,0.8);
+      border: 1px solid rgba(0,245,255,0.2);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 14px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      width: 100%;
+    }
+    input:focus, select:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(0,245,255,0.15);
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(1) sepia(1) saturate(5) hue-rotate(175deg);
+    }
+    select option { background: #07101f; }
+
+    /* ── Buttons ── */
+    .btn {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      font-weight: 700;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      padding: 10px 18px;
+      transition: all .2s;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, rgba(0,245,255,0.2), rgba(0,245,255,0.05));
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+    }
+    .btn-primary:hover {
+      background: rgba(0,245,255,0.18);
+      box-shadow: 0 0 20px rgba(0,245,255,0.4);
+      transform: translateY(-1px);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, rgba(255,0,80,0.15), transparent);
+      border: 1px solid rgba(255,0,80,0.4);
+      color: #ff4060;
+    }
+    .btn-danger:hover { background: rgba(255,0,80,0.2); box-shadow: 0 0 16px rgba(255,0,80,0.3); }
+    .btn-sm { padding: 5px 10px; font-size: 9px; }
+
+    /* ── Filters ── */
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .filter-btn {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(0,245,255,0.2);
+      background: transparent;
+      color: var(--dim);
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .filter-btn.active, .filter-btn:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(0,245,255,0.08);
+    }
+    .filter-spacer { flex: 1; }
+
+    /* ── Task list ── */
+    #taskList { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+
+    .task-item {
+      background: rgba(0,20,50,0.6);
+      border: 1px solid rgba(0,245,255,0.1);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: border-color .2s, transform .15s;
+      animation: slideIn .3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    @keyframes slideIn {
+      from { opacity:0; transform: translateX(-16px); }
+      to   { opacity:1; transform: translateX(0); }
+    }
+    .task-item::before {
+      content: '';
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 3px;
+    }
+    .task-item[data-priority="low"]::before      { background: var(--green); }
+    .task-item[data-priority="medium"]::before   { background: var(--cyan); }
+    .task-item[data-priority="high"]::before     { background: var(--yellow); }
+    .task-item[data-priority="critical"]::before { background: var(--magenta); box-shadow: 0 0 10px rgba(255,0,170,0.8); }
+
+    .task-item:hover { border-color: rgba(0,245,255,0.3); transform: translateX(3px); }
+    .task-item.completed { opacity: 0.45; }
+    .task-item.completed .task-name { text-decoration: line-through; }
+
+    /* custom checkbox */
+    .task-check {
+      width: 20px; height: 20px;
+      border-radius: 4px;
+      border: 1.5px solid rgba(0,245,255,0.4);
+      background: transparent;
+      display: grid; place-items: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all .15s;
+    }
+    .task-check:hover { border-color: var(--cyan); background: rgba(0,245,255,0.1); }
+    .task-check.checked {
+      background: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(0,245,255,0.5);
+    }
+    .task-check.checked::after { content: '✓'; font-size: 12px; color: #000; font-weight: 900; }
+
+    .task-body { flex: 1; min-width: 0; }
+    .task-name {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .task-meta {
+      display: flex; gap: 10px; align-items: center;
+      margin-top: 4px; flex-wrap: wrap;
+    }
+    .badge {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      padding: 2px 7px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .badge-low      { background: rgba(0,255,136,0.12); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+    .badge-medium   { background: rgba(0,245,255,0.10); color: var(--cyan);  border: 1px solid rgba(0,245,255,0.25); }
+    .badge-high     { background: rgba(245,255,0,0.10); color: var(--yellow); border: 1px solid rgba(245,255,0,0.3); }
+    .badge-critical { background: rgba(255,0,170,0.12); color: var(--magenta); border: 1px solid rgba(255,0,170,0.35); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 50% { box-shadow: 0 0 8px rgba(255,0,170,0.6); } }
+
+    .badge-cat { background: rgba(200,232,255,0.07); color: var(--dim); border: 1px solid rgba(200,232,255,0.15); }
+    .task-due { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--dim); }
+    .task-due.overdue { color: #ff4060; }
+
+    .task-actions { display: flex; gap: 6px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--dim);
+    }
+    .empty-icon {
+      font-size: 42px;
+      margin-bottom: 14px;
+      opacity: 0.4;
+    }
+    .empty-state p { font-family: 'Share Tech Mono', monospace; font-size: 12px; letter-spacing: 0.2em; }
+
+    /* ── Progress bar ── */
+    .progress-wrap {
+      background: rgba(0,245,255,0.07);
+      border-radius: 4px;
+      height: 5px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--magenta));
+      border-radius: 4px;
+      transition: width .6s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 0 10px rgba(0,245,255,0.5);
+    }
+
+    /* ── Clock ── */
+    .sys-clock {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--dim);
+      text-align: right;
+      margin-bottom: 10px;
+      letter-spacing: 0.15em;
+    }
+
+    /* ── Notification toast ── */
+    #toast {
+      position: fixed;
+      bottom: 28px; right: 28px;
+      background: rgba(0,20,45,0.95);
+      border: 1px solid var(--cyan);
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--cyan);
+      box-shadow: 0 0 24px rgba(0,245,255,0.3);
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all .3s cubic-bezier(.4,0,.2,1);
+      z-index: 100;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* responsive */
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-row2 { grid-template-columns: 1fr 1fr; }
+      .stats-row { grid-template-columns: repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <div class="sys-clock" id="clock"></div>
+
+  <header>
+    <div class="logo-line">NEX<span>US</span> // TASK_OPS</div>
+    <div class="tagline">Operational Command Interface &nbsp;·&nbsp; v2.0.0</div>
+  </header>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-val" id="statTotal">0</div>
+      <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="statActive">0</div>
+      <div class="stat-label">Active</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="statDone">0</div>
+      <div class="stat-label">Done</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="statRate">0%</div>
+      <div class="stat-label">Complete</div>
+    </div>
+  </div>
+
+  <!-- Add Task Panel -->
+  <div class="panel">
+    <div class="panel-title">⬡ &nbsp;New Task Directive</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>Mission Name</label>
+        <input id="taskName" placeholder="Enter task description…" />
+      </div>
+    </div>
+    <div class="form-row2">
+      <div class="field">
+        <label>Priority</label>
+        <select id="taskPriority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="critical">⚠ Critical</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="taskCategory">
+          <option value="general">General</option>
+          <option value="work">Work</option>
+          <option value="personal">Personal</option>
+          <option value="research">Research</option>
+          <option value="urgent">Urgent</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Due Date</label>
+        <input type="date" id="taskDue" />
+      </div>
+    </div>
+    <div style="margin-top:14px; display:flex; gap:10px;">
+      <button class="btn btn-primary" onclick="addTask()">⊕ &nbsp;Deploy Task</button>
+      <button class="btn btn-danger" onclick="clearCompleted()">⊗ &nbsp;Clear Done</button>
+    </div>
+  </div>
+
+  <!-- Task List Panel -->
+  <div class="panel">
+    <div class="panel-title">⬡ &nbsp;Active Directives</div>
+
+    <!-- Progress -->
+    <div class="progress-wrap" style="margin-bottom:16px;">
+      <div class="progress-bar" id="progressBar" style="width:0%"></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setFilter('all',this)">ALL</button>
+      <button class="filter-btn" onclick="setFilter('active',this)">ACTIVE</button>
+      <button class="filter-btn" onclick="setFilter('completed',this)">DONE</button>
+      <div class="filter-spacer"></div>
+      <select id="catFilter" style="width:auto;padding:4px 10px;font-size:11px;" onchange="loadTasks()">
+        <option value="all">All Categories</option>
+        <option value="general">General</option>
+        <option value="work">Work</option>
+        <option value="personal">Personal</option>
+        <option value="research">Research</option>
+        <option value="urgent">Urgent</option>
+      </select>
+    </div>
+
+    <ul id="taskList"></ul>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const API = "http://127.0.0.1:8000";
+  let currentFilter = "all";
+
+  // ── Clock ──
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      `SYS_TIME :: ${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString('en-GB')}`;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── Toast ──
+  function toast(msg, duration = 2200) {
+    const el = document.getElementById('toast');
+    el.textContent = `> ${msg}`;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), duration);
+  }
+
+  // ── Filter ──
+  function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadTasks();
+  }
+
+  // ── Stats ──
+  async function updateStats() {
+    try {
+      const r = await fetch(`${API}/stats`);
+      const d = await r.json();
+      document.getElementById('statTotal').textContent  = d.total;
+      document.getElementById('statActive').textContent = d.active;
+      document.getElementById('statDone').textContent   = d.completed;
+      document.getElementById('statRate').textContent   = d.completion_rate + '%';
+      document.getElementById('progressBar').style.width = d.completion_rate + '%';
+    } catch(e) {}
+  }
+
+  // ── Load tasks ──
+  async function loadTasks() {
+    const cat = document.getElementById('catFilter').value;
+    const url = `${API}/tasks?filter=${currentFilter}&category=${cat}`;
+    try {
+      const r = await fetch(url);
+      const d = await r.json();
+      renderTasks(d.tasks);
+      updateStats();
+    } catch(e) {
+      document.getElementById('taskList').innerHTML =
+        `<div class="empty-state"><div class="empty-icon">⚡</div><p>CONNECTION_LOST :: API offline</p></div>`;
+    }
+  }
+
+  // ── Render ──
+  function renderTasks(tasks) {
+    const list = document.getElementById('taskList');
+    if (!tasks.length) {
+      list.innerHTML = `<div class="empty-state"><div class="empty-icon">◉</div><p>NO DIRECTIVES FOUND</p></div>`;
+      return;
+    }
+    list.innerHTML = '';
+    tasks.forEach(task => {
+      const li = document.createElement('li');
+      li.className = 'task-item' + (task.completed ? ' completed' : '');
+      li.dataset.priority = task.priority;
+
+      const due = task.due_date;
+      const today = new Date().toISOString().split('T')[0];
+      const overdue = due && due < today && !task.completed;
+
+      li.innerHTML = `
+        <div class="task-check ${task.completed ? 'checked' : ''}" onclick="toggleTask('${task.id}', ${!task.completed})"></div>
+        <div class="task-body">
+          <div class="task-name">${escHtml(task.name)}</div>
+          <div class="task-meta">
+            <span class="badge badge-${task.priority}">${task.priority}</span>
+            <span class="badge badge-cat">${task.category}</span>
+            ${due ? `<span class="task-due ${overdue ? 'overdue' : ''}">📅 ${due}${overdue ? ' ⚠' : ''}</span>` : ''}
+          </div>
+        </div>
+        <div class="task-actions">
+          <button class="btn btn-danger btn-sm" onclick="deleteTask('${task.id}')">DEL</button>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Add ──
+  async function addTask() {
+    const name = document.getElementById('taskName').value.trim();
+    if (!name) { toast('ERROR :: Task name required'); return; }
+    const body = {
+      name,
+      priority: document.getElementById('taskPriority').value,
+      category: document.getElementById('taskCategory').value,
+      due_date: document.getElementById('taskDue').value || null
+    };
+    const r = await fetch(`${API}/tasks`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if (r.ok) {
+      document.getElementById('taskName').value = '';
+      document.getElementById('taskDue').value = '';
+      toast('TASK DEPLOYED');
+      loadTasks();
+    }
+  }
+
+  // ── Toggle ──
+  async function toggleTask(id, completed) {
+    await fetch(`${API}/tasks/${id}`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ completed })
+    });
+    toast(completed ? 'TASK COMPLETED ✓' : 'TASK REACTIVATED');
+    loadTasks();
+  }
+
+  // ── Delete ──
+  async function deleteTask(id) {
+    await fetch(`${API}/tasks/${id}`, { method: 'DELETE' });
+    toast('TASK TERMINATED');
+    loadTasks();
+  }
+
+  // ── Clear completed ──
+  async function clearCompleted() {
+    await fetch(`${API}/tasks`, { method: 'DELETE' });
+    toast('COMPLETED TASKS PURGED');
+    loadTasks();
+  }
+
+  // ── Enter key ──
+  document.getElementById('taskName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTask();
+  });
+
+  // ── Init ──
+  loadTasks();
+</script>
+</body>
+</html>
